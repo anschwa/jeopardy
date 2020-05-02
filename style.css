@@ -1,0 +1,30 @@
+#game-board-container {
+  padding: 20px;
+}
+
+.game-board {
+  padding: 20px;
+  color: white;
+  background: blue;
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+  width: 100%;
+  text-align: center;
+}
+
+thead {
+  color: white;
+}
+
+#questions-container {
+  width: 800px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.hidden {
+  display: none;
+}

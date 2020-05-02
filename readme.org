@@ -1,0 +1,4 @@
+* jeopardy
+A bare-bones Jeopardy game for the browser.
+
+The Jeopardy questions where sourced from the J-Archive.

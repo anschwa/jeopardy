@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8"/>
+    <title>Jeopardy!</title>
+    <link href="style.css" rel="stylesheet"/>
+  </head>
+  <body>
+    <header>
+      <h1>Jeopardy!</h1>
+      <h4>With your host,
+        <strong>
+          <input type="text" placeholder="Your name here" />
+        </strong>
+      </h4>
+      <button id="new-game">New Game</button>
+      <button id="random" class="hidden">Random Question</button>
+    </header>
+
+    <section id="game-board-container" class="hidden">
+      <h2>Categories</h2>
+
+      <div class="game-board">
+        <table border="2">
+          <thead>
+            <tr id="categories"></tr>
+          </thead>
+          <tbody id="points"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section id="questions-container" class="hidden">
+      <h2>Question</h2>
+      <h4 id="question-details"></h4>
+
+      <p id="question"></p>
+
+      <p>
+        <span><strong>Answer:</strong></span>
+        <button id="show-answer">See Answer</button>
+        <span id="answer" class="hidden"></span>
+      </p>
+
+      <button id="back">Back</button>
+    </section>
+
+    <!-- load game -->
+    <script src="main.js"></script>
+  </body>
+</html>
