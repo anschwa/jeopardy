@@ -1,4 +1,157 @@
 * jeopardy
 A bare-bones Jeopardy game for the browser.
 
-The Jeopardy questions where sourced from the J-Archive.
+* Cleaning and importing the data
+The Jeopardy questions where sourced from the J-Archive. My particular
+JSON dump is around 50MB, so importing into =postgres= will help us
+manage all the question data.
+
+To keep things simple, I'm going to generate a series of small JSON
+files that can populate a complete Jeopardy board so that we can fetch
+the questions from JavaScript without needing a database connection.
+
+Each of these files should have a subset of categories where there is
+at least one question for every point value.
+
+It is important to match these point values to the given round and
+air-date of the show so that the question's difficulty reflects the
+awarded points.
+
+| Years        | First Round | Second Round |
+|--------------+-------------+--------------|
+| 1984-2001    | $100-$500   | $200-$1,000  |
+| 2001-Present | $200-$1,000 | $400-$2,000  |
+
+Example Question JSON:
+#+BEGIN_SRC text
+{
+  "category": "HISTORY",
+  "air_date": "2004-12-31",
+  "question": "'For the last 8 years of his life, Galileo was under house arrest for espousing this man's theory'",
+  "value": "$200",
+  "answer": "Copernicus",
+  "round": "Jeopardy!",
+  "show_number": "4680"
+}
+#+END_SRC
+
+** Converting the data
+Convert the single-line array of JSON objects into a file containing
+one JSON object per line so that postgres can ingest the data all at
+once. (It's best to practice on a smaller file first)
+#+BEGIN_SRC text
+  # 0. Create smaller sample JSON file for testing. It's simpler to open
+  # the smaller file in a text editor and clean things up manually.
+  ~> head -c 1000 dump.json > practice.json
+  ~> cat practice.json
+  [{...}, {...}, {...}]
+
+  # 1. Split into newlines and remove commas.
+  # 2. Remove brackets from begining and end of file.
+  ~> sed 's|\}, |\}\n|g' < dump.json | tr -d '[' | tr -d ']' > data.json
+  ~> cat data.json
+  {...}
+  {...}
+  {...}
+#+END_SRC
+
+** Creating SQL Tables
+#+BEGIN_SRC sql
+  -- Import data using COPY with JSONB column
+  create table data_json (
+    id integer primary key generated always as identity,
+    data jsonb not null
+  );
+
+  -- Transfer data out of JSONB after importing
+  create table data (
+    id integer primary key generated always as identity,
+    category text,
+    question text,
+    answer text,
+    value text,
+    round text,
+    show_number integer,
+    air_date date
+  );
+#+END_SRC
+
+** Loading the data into postgres
+
+First we need to import our JSON.
+#+BEGIN_SRC text
+  # sh
+  ~> psql -U pguser -d jeopardy -c "copy data_json (data) from stdin;" < data.json
+
+  # psql
+  jeopardy=> select * from data_json;
+  id  | data
+  ----+------
+    1 | {...}
+    2 | {...}
+    3 | {...}
+#+END_SRC
+
+Note: In our case, several JSON strings contain escaped double-quotes,
+which will confuse the postgres =COPY= command. We can workaround this
+issue with the following hack[fn:1] by Andrew Dunstan:
+#+BEGIN_SRC text
+  "copy data_json (data) from stdin csv quote e'\x01' delimiter e'\x02';"
+#+END_SRC
+
+By using the control characters =0x01= and =0x02=, we are telling
+postgres to treat each line of JSON verbatim. This works because the
+control characters will not exist within any of our valid JSON
+objects, so postgres will not try to interpret any of our /real/
+quotes (escaped or otherwise).
+
+Now we can convert our JSONB into proper rows. (You can
+always query the JSONB directly if needed.)
+#+BEGIN_SRC sql
+  insert into data (category, question, answer, value, round, show_number, air_date)
+  (select r.*
+  from data_json
+  cross join lateral
+    jsonb_to_record (data)
+    as r(category text,
+         question text,
+         answer text,
+         value text,
+         round text,
+         show_number integer,
+         air_date date));
+#+END_SRC
+
+It can be helpful to turn on expanded display for checking the results:
+#+BEGIN_SRC text
+jeopardy=> \x
+Expanded display is on.
+
+jeopardy=> select * from data;
+-[ RECORD 1 ]--------------------------------------------------------------------------------------------------------------
+id          | 1
+category    | HISTORY
+question    | 'For the last 8 years of his life, Galileo was under house arrest for espousing this man's theory'
+answer      | Copernicus
+value       | $200
+round       | Jeopardy!
+show_number | 4680
+air_date    | 2004-12-31
+#+END_SRC
+
+* Normalizing the data
+* Generating a complete set of Jeopardy questions.
+
+* Footnotes
+[fn:1] https://www.postgresql.org/message-id/54AD8CEF.3080904%40dunslane.net
+#+BEGIN_QUOTE
+CSV format, while not designed for this, is
+nevertheless sufficiently flexible to allow successful import of json
+data meeting certain criteria (essentially no newlines), like this:
+
+    copy the_table(jsonfield)
+    from '/path/to/jsondata'
+    csv quote e'\x01' delimiter e'\x02';
+
+You aren't the first person to encounter this problem.
+#+END_QUOTE
