@@ -206,6 +206,19 @@ insert into questions (category_id, round_id, question, answer, value, show_numb
 select category_id, round_id, question, answer, value, show_number, air_date from data;
 #+END_SRC
 
+Now that the data has been normalized a little bit, I was able to
+build out some new columns to keep track of which categories held
+enough questions to fill out en entire game board. After putting
+together a list of all categories with at least one question per point
+value per round, I generated two more tables:
+#+BEGIN_SRC sql
+create table random_categories_round_1(id integer primary key);
+create table random_categories_round_2(id integer primary key);
+
+insert into random_categories_round_1(id) (select id from categories where round_1_complete = true order by random());
+insert into random_categories_round_2(id) (select id from categories where round_2_complete = true order by random());
+#+END_SRC
+
 * Generating a complete set of Jeopardy questions
 We can export a JSON file directly from =psql=.
 #+BEGIN_SRC text
@@ -213,14 +226,19 @@ We can export a JSON file directly from =psql=.
 \a               -- Set output format as unaligned (no leading spaces)
 \o jeopardy.json -- Output JSON file
 
-with game as (
-  select q.id, q.question, q.answer, q.value, r.round, c.category
+-- Choose 6 random categories and get all questions from round 1.
+-- Adjust limit and offset as needed to generate new batches of game boards.
+with games as (
+  select q.id, q.value, r.round, q.category_id, c.category, q.air_date
   from questions q
   join rounds r on r.id = q.round_id
   join categories c on c.id = q.category_id
+  where round_id = 1 and category_id in (
+    select id from random_categories_round_1 limit 6 offset 0
+  )
+  group by c.category, q.id, c.id, r.id
 )
-select row_to_json(game) from game limit 10;
-
+select row_to_json(games) from games;
 #+END_SRC
 
 * Footnotes
