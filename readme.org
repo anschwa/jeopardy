@@ -57,23 +57,23 @@ once. (It's best to practice on a smaller file first)
 
 ** Creating SQL Tables
 #+BEGIN_SRC sql
-  -- Import data using COPY with JSONB column
-  create table data_json (
-    id integer primary key generated always as identity,
-    data jsonb not null
-  );
+-- Import data using COPY with JSONB column
+create table data_json (
+  id integer primary key generated always as identity,
+  data jsonb not null
+);
 
-  -- Transfer data out of JSONB after importing
-  create table data (
-    id integer primary key generated always as identity,
-    category text,
-    question text,
-    answer text,
-    value text,
-    round text,
-    show_number integer,
-    air_date date
-  );
+-- Transfer data out of JSONB after importing
+create table data (
+  id integer primary key generated always as identity,
+  category text,
+  question text,
+  answer text,
+  value text,
+  round text,
+  show_number integer,
+  air_date date
+);
 #+END_SRC
 
 ** Loading the data into postgres
@@ -140,7 +140,88 @@ air_date    | 2004-12-31
 #+END_SRC
 
 * Normalizing the data
-* Generating a complete set of Jeopardy questions.
+Rounds
+#+BEGIN_SRC sql
+create table rounds (id integer primary key, round text);
+insert into rounds(id, round) values
+  (1, 'Jeopardy!'),
+  (2, 'Double Jeopardy!'),
+  (3, 'Final Jeopardy!'),
+  (4, 'Tiebreaker');
+#+END_SRC
+
+Categories
+#+BEGIN_SRC sql
+create table categories (id integer primary key, category text);
+
+with c as (
+  select distinct category from data order by category asc
+)
+insert into categories(id, category)
+select row_number() over () as id, category from c;
+#+END_SRC
+
+* Questions
+#+BEGIN_SRC sql
+create table questions(
+  id integer primary key generated always as identity,
+  category_id integer references categories(id),
+  round_id integer references rounds(id),
+  question text,
+  answer text,
+  value text,
+  show_number integer,
+  air_date date
+);
+#+END_SRC
+
+* Migrating the data
+The first step is to add some columns and indexes to our =data= table.
+This will help with querying the data we need to migrate into our new
+tables.
+#+BEGIN_SRC sql
+alter table data add column category_id integer, add column round_id integer;
+create index idx_date_round on data (round);
+create index idx_data_category on data (category);
+#+END_SRC
+
+Now we can populate the existing rows with their soon-to-be foreign keys:
+#+BEGIN_SRC sql
+-- Set round_id
+update data d
+set round_id = r.id
+from rounds r
+where r.round = d.round
+
+-- set category_id
+update data d
+set category_id = c.id
+from categories c
+where c.category = d.category
+#+END_SRC
+
+Finally, let's insert the data into our normalized tables:
+#+BEGIN_SRC sql
+insert into questions (category_id, round_id, question, answer, value, show_number, air_date)
+select category_id, round_id, question, answer, value, show_number, air_date from data;
+#+END_SRC
+
+* Generating a complete set of Jeopardy questions
+We can export a JSON file directly from =psql=.
+#+BEGIN_SRC text
+\t               -- Set tuples only to on (only print rows)
+\a               -- Set output format as unaligned (no leading spaces)
+\o jeopardy.json -- Output JSON file
+
+with game as (
+  select q.id, q.question, q.answer, q.value, r.round, c.category
+  from questions q
+  join rounds r on r.id = q.round_id
+  join categories c on c.id = q.category_id
+)
+select row_to_json(game) from game limit 10;
+
+#+END_SRC
 
 * Footnotes
 [fn:1] https://www.postgresql.org/message-id/54AD8CEF.3080904%40dunslane.net
@@ -149,9 +230,9 @@ CSV format, while not designed for this, is
 nevertheless sufficiently flexible to allow successful import of json
 data meeting certain criteria (essentially no newlines), like this:
 
-    copy the_table(jsonfield)
-    from '/path/to/jsondata'
-    csv quote e'\x01' delimiter e'\x02';
+copy the_table(jsonfield)
+from '/path/to/jsondata'
+csv quote e'\x01' delimiter e'\x02';
 
 You aren't the first person to encounter this problem.
 #+END_QUOTE
