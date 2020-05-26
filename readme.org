@@ -229,7 +229,7 @@ We can export a JSON file directly from =psql=.
 -- Choose 6 random categories and get all questions from round 1.
 -- Adjust limit and offset as needed to generate new batches of game boards.
 with games as (
-  select q.id, q.value, r.round, q.category_id, c.category, q.air_date
+  select q.id, q.question, q.answer, q.value, r.round, c.category, q.air_date
   from questions q
   join rounds r on r.id = q.round_id
   join categories c on c.id = q.category_id
