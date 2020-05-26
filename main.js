@@ -2,7 +2,7 @@
 let allQuestions;
 let allCategories;
 let gameCategories = [];
-window.fetch('jeopardy-questions.json')
+window.fetch('api/hello-jeopardy.json')
   .then(response => response.json())
   .then(data => {
     allQuestions = data;
@@ -98,7 +98,7 @@ const showRandomQuestion = () => {
 
 // Setup board
 const setupBoard = () => {
-  [2,4,6,8,10].forEach((v) => {
+  [1,2,3,4,5].forEach((v) => {
     const row = document.createElement('tr');
 
     for (let i=0; i<6; i++) {

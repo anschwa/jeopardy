@@ -76,7 +76,7 @@ create table data (
 );
 #+END_SRC
 
-** Loading the data into postgres
+** Loading into postgres
 
 First we need to import our JSON.
 #+BEGIN_SRC text
@@ -139,7 +139,7 @@ show_number | 4680
 air_date    | 2004-12-31
 #+END_SRC
 
-* Normalizing the data
+* Normalizing
 Rounds
 #+BEGIN_SRC sql
 create table rounds (id integer primary key, round text);
@@ -161,7 +161,7 @@ insert into categories(id, category)
 select row_number() over () as id, category from c;
 #+END_SRC
 
-* Questions
+Questions
 #+BEGIN_SRC sql
 create table questions(
   id integer primary key generated always as identity,
@@ -175,7 +175,7 @@ create table questions(
 );
 #+END_SRC
 
-* Migrating the data
+* Migrating data into new tables
 The first step is to add some columns and indexes to our =data= table.
 This will help with querying the data we need to migrate into our new
 tables.
@@ -221,6 +221,12 @@ insert into random_categories_round_2(id) (select id from categories where round
 
 * Generating a complete set of Jeopardy questions
 We can export a JSON file directly from =psql=.
+
+We take advantage of a couple Postgres tricks here: First,
+=row_to_json= transforms our SQL output to JSON, while =json_agg=
+takes all our objects and throws them into an array. This way, we end
+up with a valid JSON document.
+
 #+BEGIN_SRC text
 \t               -- Set tuples only to on (only print rows)
 \a               -- Set output format as unaligned (no leading spaces)
@@ -238,8 +244,11 @@ with games as (
   )
   group by c.category, q.id, c.id, r.id
 )
-select row_to_json(games) from games;
+select json_agg(row_to_json(games)) from games;
 #+END_SRC
+
+[[file:gen-game-data.sh][This bash script]] automates the process of batching these
+questions up into nice stand-alone JSON files.
 
 * Footnotes
 [fn:1] https://www.postgresql.org/message-id/54AD8CEF.3080904%40dunslane.net
