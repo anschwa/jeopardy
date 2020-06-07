@@ -28,3 +28,8 @@ thead {
 .hidden {
   display: none;
 }
+
+#game-controls {
+  display: flex;
+  justify-content: space-between;
+}

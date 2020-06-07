@@ -1,13 +1,53 @@
-// Setup questions
+// Game Elements
+const board             = document.getElementById('game-board-container');
+const questionContainer = document.getElementById('questions-container');
+const points            = document.getElementById('points');
+const categories        = document.getElementById('categories');
+const showAnswer        = document.getElementById('show-answer');
+const back              = document.getElementById('back');
+const question          = document.getElementById('question');
+const details           = document.getElementById('question-details');
+const answer            = document.getElementById('answer');
+const random            = document.getElementById('random');
+const questionSet       = document.getElementById('question-set');
+
+// Game Globals
 let allQuestions;
 let allCategories;
 let gameCategories = [];
-window.fetch('api/hello-jeopardy.json')
-  .then(response => response.json())
-  .then(data => {
-    allQuestions = data;
-    allCategories = allQuestions.map(q => q.category).filter((x, i, self) => self.indexOf(x) === i);
-  });
+let currentQuestionSet = 'default';
+
+// Create question sets
+const questionSetNames = ['strange-flood', 'literate-form', 'fast-stomach', 'behave-harbor', 'market-glove', 'gusty-stem', 'sheep-language', 'volcano-root', 'general-paste', 'friction-boot', 'faulty-purpose', 'polite-pizzas', 'earthy-sock', 'trains-tax', 'system-bulb', 'giraffe-book', 'thumb-grab', 'tent-shoes', 'icicle-soap', 'beef-canvas', 'sleep-hum'];
+
+for (let i = 0; i < 10; i ++) {
+  const option = document.createElement('option');
+  option.innerText = questionSetNames[i];
+  option.setAttribute('value', `round-1-batch-${i+1}`);
+  questionSet.appendChild(option);
+}
+
+// Setup questions
+const loadQuestionSet = (qsetUrl) => {
+  const newQuestionSet = qsetUrl.split('.')[0]; // (round-x-batch-y.min.json)
+  if (currentQuestionSet === newQuestionSet) {
+    return;
+  }
+
+  allQuestions = null;
+  allCategories = null;
+  gameCategories = [];
+  currentQuestionSet = newQuestionSet;
+
+  return window.fetch(qsetUrl)
+               .then(response => response.json())
+               .then(data => {
+                 allQuestions = data;
+                 allCategories = allQuestions
+                   .map(q => q.category)
+                   .filter((x, i, self) => self.indexOf(x) === i);
+               });
+};
 
 // Jeopardy!
 const getRandom = (min, max) => (Math.random() * (max - min +1)) << 0;
@@ -31,18 +71,6 @@ const setCategories = () => {
     categoriesEl.appendChild(el);
   });
 };
-
-// Game Elements
-const board = document.getElementById('game-board-container');
-const questionContainer = document.getElementById('questions-container');
-const points = document.getElementById('points');
-const categories = document.getElementById('categories');
-const showAnswer = document.getElementById('show-answer');
-const back = document.getElementById('back');
-const question = document.getElementById('question');
-const details = document.getElementById('question-details');
-const answer = document.getElementById('answer');
-const random = document.getElementById('random');
 
 back.addEventListener('click', () => {
   questionContainer.classList.add('hidden');
@@ -127,10 +155,25 @@ const setupBoard = () => {
 
 // Start New Game
 let isPlayAgain = false;
-document.getElementById('new-game').addEventListener('click', () => {
-  const msg = 'Are you sure you want to start a new game?';
+document.getElementById('new-game').addEventListener('click', async () => {
+  let msg = 'Are you sure you want to start a new game?';
+  const qset = questionSet.value;
+  const qsetId = qset[qset.length-1]; // Get batch number (round-x-batch-y)
+
+  if (qset !== "default") {
+    msg += `\n\nQuestion set: ${questionSetNames[qsetId]}`;
+  }
+
+  // Confirm new game
   if (isPlayAgain && !window.confirm(msg)) {
     return;
+  }
+
+  // Fetch new questions
+  if (qset === "default") {
+    await loadQuestionSet('api/hello-jeopardy.json');
+  } else {
+    await loadQuestionSet(`api/round/1/${qset}.min.json`);
   }
 
   // Reset
@@ -144,5 +187,6 @@ document.getElementById('new-game').addEventListener('click', () => {
   // Show board
   board.classList.remove('hidden');
   random.classList.remove('hidden');
+  questionSet.classList.remove('hidden');
   isPlayAgain = true;
 });

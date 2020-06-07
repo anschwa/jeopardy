@@ -13,8 +13,18 @@
           <input type="text" placeholder="Your name here" />
         </strong>
       </h4>
-      <button id="new-game">New Game</button>
-      <button id="random" class="hidden">Random Question</button>
+
+      <div id="game-controls">
+        <button id="random" class="hidden">Random Question</button>
+
+        <div class="group">
+          <select id="question-set" name="question-set" class="hidden">
+            <option value="default">Choose a question set…</option>
+          </select>
+
+          <button id="new-game">New Game</button>
+        </div>
+      </div>
     </header>
 
     <section id="game-board-container" class="hidden">
